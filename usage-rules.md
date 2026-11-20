@@ -94,7 +94,10 @@ rules before writing code that uses it.
   `page: [:limit, :offset]` picks keys; `sort: 7` and `page: [limit: 2]` pin
   numbers. A read that requires or defaults to pagination stops the build with
   `page: false`. A default field named like one of the rpc's inputs stops the
-  build and names the opt-out.
+  build and names the opt-out. A client may sort and filter (at any depth,
+  and through relationships) only by fields in the rpc's response message; any
+  other field, even a public one, is `INVALID_ARGUMENT`, so `hide_fields`
+  also hides a field from sort and filter probing.
 - A union is rendered as a `oneof`. An `Ash.Type.Enum` or atom with `one_of` is a
   proto `enum`: append new values at the end of `values/0`, never reorder.
 - Do not put identity in the request (no `user_id`, `tenant` field). Identity

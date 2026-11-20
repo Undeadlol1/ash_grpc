@@ -407,8 +407,9 @@ defmodule AshGrpc.Handler do
         do: [page: decoded.read |> Map.take(@page_options) |> Enum.to_list()],
         else: []
 
-    with {:ok, query} <- read_input(query, decoded.read, :sort, &Ash.Query.sort_input/2),
-         {:ok, query} <- read_input(query, decoded.read, :filter, &Ash.Query.filter_input/2) do
+    with {:ok, query} <- read_input(spec, query, decoded.read, :sort, &Ash.Query.sort_input/2),
+         {:ok, query} <-
+           read_input(spec, query, decoded.read, :filter, &Ash.Query.filter_input/2) do
       Ash.read(query, page ++ deadline(stream))
     end
   end
@@ -477,16 +478,53 @@ defmodule AshGrpc.Handler do
   defp bulk_records(%Ash.BulkResult{errors: errors}, path),
     do: {:error, Ash.Error.set_path(errors, path)}
 
-  defp read_input(query, read, name, apply) when is_map_key(read, name) do
-    applied = apply.(query, read[name])
+  defp read_input(spec, query, read, name, apply) when is_map_key(read, name) do
+    with nil <- unsent_field(spec, name, read[name]) do
+      applied = apply.(query, read[name])
 
-    case applied.errors -- query.errors do
-      [] -> {:ok, applied}
-      [error | _] -> {:error, invalid_argument(%{name: name}, Exception.message(error))}
+      case applied.errors -- query.errors do
+        [] -> {:ok, applied}
+        [error | _] -> {:error, invalid_argument(%{name: name}, Exception.message(error))}
+      end
+    else
+      field ->
+        {:error,
+         invalid_argument(%{name: name}, "#{inspect(field)} is not a field this rpc sends")}
     end
   end
 
-  defp read_input(query, _read, _name, _apply), do: {:ok, query}
+  defp read_input(_spec, query, _read, _name, _apply), do: {:ok, query}
+
+  defp unsent_field(spec, :sort, sort) do
+    sort
+    |> String.split(",")
+    |> Enum.map(&(&1 |> String.trim() |> String.trim_leading("+") |> String.trim_leading("-")))
+    |> Enum.find(&(&1 not in sent_names(spec.message_fields)))
+  end
+
+  defp unsent_field(spec, :filter, filter),
+    do: unsent_in_filter(filter, spec.message_fields, spec.messages)
+
+  defp unsent_in_filter(filter, fields, messages) when is_map(filter),
+    do: Enum.find_value(filter, fn {key, value} -> unsent_key(key, value, fields, messages) end)
+
+  defp unsent_in_filter(filters, fields, messages) when is_list(filters),
+    do: Enum.find_value(filters, &unsent_in_filter(&1, fields, messages))
+
+  defp unsent_in_filter(_value, _fields, _messages), do: nil
+
+  defp unsent_key(key, value, fields, messages) when key in ["and", "or", "not"],
+    do: unsent_in_filter(value, fields, messages)
+
+  defp unsent_key(key, value, fields, messages) do
+    case Enum.find(fields, &(Atom.to_string(&1.name) == key)) do
+      nil -> key
+      %{kind: {:message, name}} -> unsent_in_filter(value, messages[name].fields, messages)
+      _scalar -> nil
+    end
+  end
+
+  defp sent_names(fields), do: Enum.map(fields, &Atom.to_string(&1.name))
 
   defp by_key(query, primary_key) when primary_key == %{}, do: query
 

@@ -104,11 +104,10 @@ defmodule AshGrpc.ReadWireFieldsTest do
           %V1.WatchAccountsRequest{filter: filter},
           %V1.WatchAccountsRequest{sort: "api_token"}
         ] do
-      assert {:ok, replies} =
-               Stub.watch_accounts(channel, request, metadata: metadata, timeout: 2_000)
-
-      assert {:error, %RPCError{status: status}} = Enum.find(replies, &match?({:error, _}, &1))
-      assert status == Status.invalid_argument()
+      assert_refused(
+        Stub.watch_accounts(channel, request, metadata: metadata, timeout: 2_000),
+        "api_token"
+      )
     end
   end
 
