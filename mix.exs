@@ -111,7 +111,7 @@ defmodule AshGrpc.MixProject do
       {:grpc, "~> 1.0"},
       {:grpc_server, "~> 1.0"},
       {:protobuf, "~> 0.16"},
-      {:gun, "~> 2.4"},
+      {:gun, "~> 2.4", only: :test},
       {:grpc_reflection, "~> 0.5", optional: true},
       {:picosat_elixir, "~> 0.2", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
