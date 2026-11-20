@@ -45,7 +45,7 @@ defmodule AshGrpc.MixProject do
   defp docs do
     [
       main: "readme",
-      source_ref: "v#{@version}",
+      source_ref: "main",
       extras: [
         {"README.md", title: "Home"},
         "documentation/tutorials/getting-started.md",
@@ -108,10 +108,10 @@ defmodule AshGrpc.MixProject do
       {:spark, "~> 2.3"},
       {:igniter, "~> 0.6", optional: true},
       {:jason, "~> 1.4"},
-      {:grpc, "~> 1.0"},
-      {:grpc_server, "~> 1.0"},
+      {:grpc, "~> 1.1"},
+      {:grpc_server, "~> 1.1"},
       {:protobuf, "~> 0.16"},
-      {:gun, "~> 2.4"},
+      {:gun, "~> 2.4", only: :test},
       {:grpc_reflection, "~> 0.5", optional: true},
       {:picosat_elixir, "~> 0.2", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}

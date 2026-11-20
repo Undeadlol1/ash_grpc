@@ -107,17 +107,17 @@ defmodule AshGrpc.ErrorsTest do
     end)
   end
 
-  test "an error list mixing forbidden and invalid is one status that hides no data" do
-    capture_log(fn ->
-      error =
-        Errors.to_rpc_error([
-          Policy.exception([]),
-          Required.exception(field: :title, type: :attribute)
-        ])
+  test "an error list mixing forbidden and invalid is PERMISSION_DENIED in either order" do
+    forbidden = Policy.exception([])
+    invalid = Required.exception(field: :title, type: :attribute)
 
-      assert error.status in [Status.permission_denied(), Status.invalid_argument()]
-      assert error.message in ["Forbidden", "Invalid request"]
-    end)
+    for errors <- [[forbidden, invalid], [invalid, forbidden]] do
+      error = Errors.to_rpc_error(errors)
+
+      assert error.status == Status.permission_denied()
+      assert error.message == "Forbidden"
+      assert error.details in [nil, []]
+    end
   end
 
   test "authenticator refusals map to UNAUTHENTICATED and UNAVAILABLE" do

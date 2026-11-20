@@ -53,6 +53,11 @@ defmodule AshGrpc.Endpoint do
       default is `[]`: no compression, and a call that asks for one is
       refused. The health service does not take part. See
       [Compression](compression.md).
+    * `:max_subscriptions` - how many subscription streams this endpoint keeps
+      open at once, on this node. One more is answered `RESOURCE_EXHAUSTED`.
+      Each open subscription re-reads its list on every write to its resource,
+      so this bounds that work. The default is `1000`. See
+      [Subscriptions](subscriptions.md).
     * `:response_meta` - `true` gives every unary response message
       `optional string meta = 2;` (see `put_response_meta/2`). The default is
       `false` and changes nothing. Subscriptions never carry `meta`.
@@ -128,6 +133,7 @@ defmodule AshGrpc.Endpoint do
     reflection? = Keyword.get(opts, :reflection, false)
     health? = Keyword.get(opts, :health, false)
     compressors = Keyword.get(opts, :compressors, [])
+    max_subscriptions = Keyword.get(opts, :max_subscriptions, 1_000)
     if reflection?, do: ensure_reflection!()
     committed = committed_files(domains, Application.get_env(:ash_grpc, :proto_output))
 
@@ -184,6 +190,7 @@ defmodule AshGrpc.Endpoint do
       @doc false
       def __ash_grpc__(:domains), do: unquote(domains)
       def __ash_grpc__(:response_meta), do: unquote(response_meta?)
+      def __ash_grpc__(:max_subscriptions), do: unquote(max_subscriptions)
       def __ash_grpc__(:protos), do: unquote(Macro.escape(AshGrpc.Proto.files(packages)))
 
       @doc "A child spec running this endpoint under `GRPC.Server.Supervisor`."
@@ -435,6 +442,7 @@ defmodule AshGrpc.Endpoint do
     message = Enum.find(package.messages, &(&1.resource == rpc.resource))
 
     %{
+      endpoint: base,
       resource: rpc.resource,
       action: rpc.action,
       action_type: rpc.action_type,

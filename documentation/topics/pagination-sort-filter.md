@@ -118,9 +118,10 @@ names separated by commas, `-` for descending.
 %V1.ListPostsRequest{sort: "-inserted_at,title"}
 ```
 
-Only public attributes, calculations and aggregates can be sorted on. An
-unknown or private field is `INVALID_ARGUMENT` with a field violation on
-`sort`. The sort is added after the action's own.
+Only fields that are in the rpc's response message can be sorted on, so a
+field hidden with `hide_fields`, left out of `fields` or private never can. Any
+other field is `INVALID_ARGUMENT` with a field violation on `sort` that names
+it. The sort is added after the action's own.
 
 ## Filtering
 
@@ -140,9 +141,15 @@ filter =
 %V1.ListPostsRequest{filter: filter}
 ```
 
-A plain value means equality: `%{"title" => "Hello"}`. Only public fields can
-be filtered on. An unknown or private field, or an unknown operator, is
-`INVALID_ARGUMENT` with a field violation on `filter`.
+A plain value means equality: `%{"title" => "Hello"}`. Only fields that are in
+the rpc's response message can be filtered on, at every depth of `and`, `or`
+and `not`. Otherwise a client could learn a hidden value by asking
+`greater_than` questions about it. A relationship path (`%{"comments" =>
+%{"body" => ...}}`) is allowed when every field after the relationship is in
+the related message too; the operator shortcut on a relationship itself
+(`is_nil`, or `eq` on the related key) is not. Any other field, or an unknown
+operator, is `INVALID_ARGUMENT` with a field violation on `filter` that names
+it.
 
 The filter narrows the action's result; it never widens it. Policies, the
 action's own filter and the tenant still apply, so a client cannot filter its

@@ -13,7 +13,8 @@ defmodule AshGrpc.Handler do
     return_records?: true,
     return_errors?: true,
     transaction: :all,
-    stop_on_error?: true
+    stop_on_error?: true,
+    notify?: true
   ]
 
   def handle(spec, request, stream) do
@@ -122,6 +123,7 @@ defmodule AshGrpc.Handler do
       with {:ok, auth_opts} <- authenticated(stream),
            {opts, _deadline} = ash_opts(auth_opts, stream),
            {:ok, decoded} <- input(spec, request),
+           :ok <- within_subscription_limit(spec.endpoint),
            :ok <- AshGrpc.Notifier.subscribe(spec.resource),
            subscription = %{spec: spec, decoded: decoded, opts: opts, stream: stream},
            {:ok, records} <- read_all(subscription),
@@ -134,6 +136,16 @@ defmodule AshGrpc.Handler do
     then(with_result, fn {:error, error} -> AshGrpc.Errors.to_rpc_error(error) end)
   rescue
     error -> AshGrpc.Errors.internal(error, __STACKTRACE__)
+  end
+
+  defp within_subscription_limit(endpoint) do
+    group = {:subscriptions, endpoint}
+    :ok = :pg.join(AshGrpc.Notifier, group, self())
+    limit = endpoint.__ash_grpc__(:max_subscriptions)
+
+    if length(:pg.get_local_members(AshGrpc.Notifier, group)) > limit,
+      do: {:error, {:too_many_subscriptions, limit}},
+      else: :ok
   end
 
   defp watch(%{spec: %{resource: resource}} = subscription, sent) do
@@ -310,8 +322,9 @@ defmodule AshGrpc.Handler do
     end
   end
 
-  defp decode(_spec, %{source: :primary_key, type: type, constraints: constraints}, value) do
-    with {:ok, cast} when not is_nil(cast) <- Ash.Type.cast_input(type, value, constraints),
+  defp decode(spec, %{source: :primary_key, type: type, constraints: constraints} = field, value) do
+    with {:ok, wire} when not is_nil(wire) <- Types.decode_field(field, value, spec.messages),
+         {:ok, cast} when not is_nil(cast) <- Ash.Type.cast_input(type, wire, constraints),
          {:ok, key} when not is_nil(key) <- Ash.Type.apply_constraints(type, cast, constraints) do
       {:ok, key}
     else
@@ -329,9 +342,9 @@ defmodule AshGrpc.Handler do
     end
   end
 
-  defp decode(_spec, %{source: :bulk_keys} = field, keys) do
+  defp decode(spec, %{source: :bulk_keys} = field, keys) do
     with :ok <- within_limit(field, keys),
-         do: Types.map_while_ok(keys, &decode_key(field.keys, &1))
+         do: Types.map_while_ok(keys, &decode_key(spec, field.keys, &1))
   end
 
   defp decode(spec, field, value), do: Types.decode_field(field, value, spec.messages)
@@ -348,12 +361,12 @@ defmodule AshGrpc.Handler do
     end
   end
 
-  defp decode_key(key_fields, value) do
+  defp decode_key(spec, key_fields, value) do
     parts = if match?([_single], key_fields), do: %{hd(key_fields).name => value}, else: value
 
     with {:ok, pairs} <-
            Types.map_while_ok(key_fields, fn key ->
-             with {:ok, cast} <- decode(nil, key, Map.get(parts, key.name)),
+             with {:ok, cast} <- decode(spec, key, Map.get(parts, key.name)),
                   do: {:ok, {key.name, cast}}
            end) do
       {:ok, Map.new(pairs)}
@@ -407,8 +420,9 @@ defmodule AshGrpc.Handler do
         do: [page: decoded.read |> Map.take(@page_options) |> Enum.to_list()],
         else: []
 
-    with {:ok, query} <- read_input(query, decoded.read, :sort, &Ash.Query.sort_input/2),
-         {:ok, query} <- read_input(query, decoded.read, :filter, &Ash.Query.filter_input/2) do
+    with {:ok, query} <- read_input(spec, query, decoded.read, :sort, &Ash.Query.sort_input/2),
+         {:ok, query} <-
+           read_input(spec, query, decoded.read, :filter, &Ash.Query.filter_input/2) do
       Ash.read(query, page ++ deadline(stream))
     end
   end
@@ -477,16 +491,53 @@ defmodule AshGrpc.Handler do
   defp bulk_records(%Ash.BulkResult{errors: errors}, path),
     do: {:error, Ash.Error.set_path(errors, path)}
 
-  defp read_input(query, read, name, apply) when is_map_key(read, name) do
-    applied = apply.(query, read[name])
+  defp read_input(spec, query, read, name, apply) when is_map_key(read, name) do
+    with nil <- unsent_field(spec, name, read[name]) do
+      applied = apply.(query, read[name])
 
-    case applied.errors -- query.errors do
-      [] -> {:ok, applied}
-      [error | _] -> {:error, invalid_argument(%{name: name}, Exception.message(error))}
+      case applied.errors -- query.errors do
+        [] -> {:ok, applied}
+        [error | _] -> {:error, invalid_argument(%{name: name}, Exception.message(error))}
+      end
+    else
+      field ->
+        {:error,
+         invalid_argument(%{name: name}, "#{inspect(field)} is not a field this rpc sends")}
     end
   end
 
-  defp read_input(query, _read, _name, _apply), do: {:ok, query}
+  defp read_input(_spec, query, _read, _name, _apply), do: {:ok, query}
+
+  defp unsent_field(spec, :sort, sort) do
+    sort
+    |> String.split(",")
+    |> Enum.map(&(&1 |> String.trim() |> String.trim_leading("+") |> String.trim_leading("-")))
+    |> Enum.find(&(&1 not in sent_names(spec.message_fields)))
+  end
+
+  defp unsent_field(spec, :filter, filter),
+    do: unsent_in_filter(filter, spec.message_fields, spec.messages)
+
+  defp unsent_in_filter(filter, fields, messages) when is_map(filter),
+    do: Enum.find_value(filter, fn {key, value} -> unsent_key(key, value, fields, messages) end)
+
+  defp unsent_in_filter(filters, fields, messages) when is_list(filters),
+    do: Enum.find_value(filters, &unsent_in_filter(&1, fields, messages))
+
+  defp unsent_in_filter(_value, _fields, _messages), do: nil
+
+  defp unsent_key(key, value, fields, messages) when key in ["and", "or", "not"],
+    do: unsent_in_filter(value, fields, messages)
+
+  defp unsent_key(key, value, fields, messages) do
+    case Enum.find(fields, &(Atom.to_string(&1.name) == key)) do
+      nil -> key
+      %{kind: {:message, name}} -> unsent_in_filter(value, messages[name].fields, messages)
+      _scalar -> nil
+    end
+  end
+
+  defp sent_names(fields), do: Enum.map(fields, &Atom.to_string(&1.name))
 
   defp by_key(query, primary_key) when primary_key == %{}, do: query
 

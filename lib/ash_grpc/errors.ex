@@ -28,6 +28,9 @@ defmodule AshGrpc.Errors do
   def to_rpc_error({:too_many_failures, limit}),
     do: rpc_error(:resource_exhausted, "More than #{limit} messages failed")
 
+  def to_rpc_error({:too_many_subscriptions, limit}),
+    do: rpc_error(:resource_exhausted, "More than #{limit} subscriptions are open")
+
   def to_rpc_error(error) do
     case Ash.Error.to_error_class(error) do
       %Ash.Error.Forbidden{} ->

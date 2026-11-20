@@ -295,7 +295,7 @@ More in [Evolving your schema](documentation/topics/evolving-your-schema.md).
 
 ### Call it from Elixir
 
-The endpoint also defines a client, which is what your tests use:
+The endpoint also defines a client, which is what your tests use. A client that uses `GRPC.Stub.connect/2` needs `{:gun, "~> 2.4"}` in its own deps, because grpc made its HTTP client optional.
 
 ```elixir
 alias MyAppWeb.GrpcEndpoint.Blog.V1

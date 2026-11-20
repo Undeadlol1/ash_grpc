@@ -26,6 +26,8 @@ defmodule MyAppWeb.GrpcSupport do
 end
 ```
 
+A client that uses `GRPC.Stub.connect/2` needs `{:gun, "~> 2.4"}` in its own deps, because grpc made its HTTP client optional.
+
 `start_supervised!` stops the endpoint when the test ends. Tests that share
 a data layer such as ETS should not be `async: true`.
 

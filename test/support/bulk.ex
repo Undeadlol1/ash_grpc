@@ -4,6 +4,7 @@ defmodule AshGrpc.TestSupport.Memo do
     domain: AshGrpc.TestSupport.Bulks,
     data_layer: Ash.DataLayer.Ets,
     authorizers: [Ash.Policy.Authorizer],
+    simple_notifiers: [AshGrpc.Notifier],
     extensions: [AshGrpc.Resource]
 
   grpc do
@@ -149,6 +150,7 @@ defmodule AshGrpc.TestSupport.Bulks do
       rpc Badge, :create_badges, :create, bulk?: true, max_bulk_size: 200, args: [name: 1]
       rpc Seat, :reserve_seats, :reserve, bulk?: true, args: [row: 1, number: 2, holder: 3]
       rpc Seat, :delete_seats, :destroy, bulk?: true, args: [row: 1, number: 2]
+      subscription Memo, :watch_memos, :read, sort: false, filter: false
     end
   end
 
