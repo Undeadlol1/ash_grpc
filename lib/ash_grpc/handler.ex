@@ -311,8 +311,9 @@ defmodule AshGrpc.Handler do
     end
   end
 
-  defp decode(_spec, %{source: :primary_key, type: type, constraints: constraints}, value) do
-    with {:ok, cast} when not is_nil(cast) <- Ash.Type.cast_input(type, value, constraints),
+  defp decode(spec, %{source: :primary_key, type: type, constraints: constraints} = field, value) do
+    with {:ok, wire} when not is_nil(wire) <- Types.decode_field(field, value, spec.messages),
+         {:ok, cast} when not is_nil(cast) <- Ash.Type.cast_input(type, wire, constraints),
          {:ok, key} when not is_nil(key) <- Ash.Type.apply_constraints(type, cast, constraints) do
       {:ok, key}
     else
@@ -330,9 +331,9 @@ defmodule AshGrpc.Handler do
     end
   end
 
-  defp decode(_spec, %{source: :bulk_keys} = field, keys) do
+  defp decode(spec, %{source: :bulk_keys} = field, keys) do
     with :ok <- within_limit(field, keys),
-         do: Types.map_while_ok(keys, &decode_key(field.keys, &1))
+         do: Types.map_while_ok(keys, &decode_key(spec, field.keys, &1))
   end
 
   defp decode(spec, field, value), do: Types.decode_field(field, value, spec.messages)
@@ -349,12 +350,12 @@ defmodule AshGrpc.Handler do
     end
   end
 
-  defp decode_key(key_fields, value) do
+  defp decode_key(spec, key_fields, value) do
     parts = if match?([_single], key_fields), do: %{hd(key_fields).name => value}, else: value
 
     with {:ok, pairs} <-
            Types.map_while_ok(key_fields, fn key ->
-             with {:ok, cast} <- decode(nil, key, Map.get(parts, key.name)),
+             with {:ok, cast} <- decode(spec, key, Map.get(parts, key.name)),
                   do: {:ok, {key.name, cast}}
            end) do
       {:ok, Map.new(pairs)}

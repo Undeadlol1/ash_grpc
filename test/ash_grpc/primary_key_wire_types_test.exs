@@ -53,7 +53,7 @@ defmodule AshGrpc.PrimaryKeyWireTypesTest do
     for at <- [first, second], do: Ash.Seed.seed!(Event, %{at: at, label: "doomed"})
     keys = for at <- [first, second], do: %Timestamp{seconds: DateTime.to_unix(at), nanos: 0}
 
-    assert {:ok, %{succeeded: 2}} =
+    assert {:ok, %{result: [_first, _second]}} =
              Stub.delete_events(channel, %V1.DeleteEventsRequest{ids: keys}, metadata: metadata)
   end
 end
