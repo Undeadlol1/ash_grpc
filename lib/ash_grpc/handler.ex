@@ -13,7 +13,8 @@ defmodule AshGrpc.Handler do
     return_records?: true,
     return_errors?: true,
     transaction: :all,
-    stop_on_error?: true
+    stop_on_error?: true,
+    notify?: true
   ]
 
   def handle(spec, request, stream) do

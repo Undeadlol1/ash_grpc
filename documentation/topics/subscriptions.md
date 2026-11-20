@@ -147,9 +147,9 @@ gRPC-Web clients can stream too, so a browser can subscribe.
   if the Erlang nodes are connected: the notifier uses `:pg`.
 * A subscriber with no tenant, on a multitenant resource, gets no changes
   that were written with a tenant.
-* Bulk actions send no notifications unless they are run with `notify?: true`
-  (see `Ash.bulk_create/4` and its siblings). A write that never goes through
-  an Ash action cannot be seen at all.
+* A write that never goes through an Ash action cannot be seen at all, and
+  neither can a bulk action of your own that does not run with `notify?: true`
+  (see `Ash.bulk_create/4` and its siblings). The library's bulk rpcs do notify.
 
 See [Testing](testing.md) for how to run a stream in a test.
 
