@@ -1,68 +1,96 @@
 defmodule AshGrpc.Authenticator do
   @moduledoc """
-  Server-side authentication for ash_grpc requests.
+  Turns request headers into who is calling. The only source of identity:
+  nothing the client sends reaches Ash any other way.
 
-  An authenticator inspects the raw request headers (e.g. an
-  `authorization: Bearer <token>` header) and *derives* the Ash actor on
-  the server. This is the trust anchor that makes gRPC safe to expose:
-  unlike the `x-ash-actor` metadata convention — which lets a client claim
-  any identity and is rejected on untrusted endpoints — an authenticator's
-  actor comes from a verified credential the server controls.
+      defmodule MyApp.GrpcAuthenticator do
+        @behaviour AshGrpc.Authenticator
 
-  Configure one per endpoint via the `:authenticator` option passed to the
-  transport, or globally with `config :ash_grpc, :authenticator, MyAuth`.
+        @impl true
+        def authenticate(%{"authorization" => "Bearer " <> token}) do
+          case MyApp.Tokens.verify(token) do
+            {:ok, user} -> {:ok, actor: user, tenant: user.org}
+            {:error, :keys_down} -> {:error, :unavailable}
+            {:error, _} -> {:error, :unauthenticated}
+          end
+        end
 
-  Return values from `authenticate/2`:
+        def authenticate(_headers), do: {:error, :unauthenticated}
+      end
 
-    * `{:ok, actor}` — authenticated; `actor` becomes the Ash actor and
-      overrides any client-supplied `x-ash-actor`.
-    * `:anonymous` — no credentials presented; the request proceeds with a
-      `nil` actor so Ash policies decide what anonymous access is allowed.
-    * `{:error, reason}` — credentials were presented but invalid; the
-      request is rejected with gRPC `unauthenticated`.
+  `{:ok, opts}` may hold `:actor`, `:tenant` and `:context`; other keys are
+  ignored. Authorization always runs. `{:error, :unauthenticated}` answers
+  `UNAUTHENTICATED`, `{:error, :unavailable}` answers `UNAVAILABLE`, and
+  `{:error, {:unavailable, retry_after_ms}}` answers `UNAVAILABLE` with the
+  `grpc-retry-pushback-ms` header telling the client when to retry.
+
+  Authentication runs before every interceptor of the endpoint, so a refused
+  call reaches none of them. Interceptors read the result with
+  `fetch_opts/1`.
+
+  `authenticate/1` gets the request headers as a map with lowercase string
+  keys. Anything else it returns is not an answer: if it raises, the call
+  ends with `INTERNAL` and the cause is logged. See the
+  [Authentication](authentication.md) guide.
   """
 
   @type headers :: %{optional(String.t()) => String.t()}
-  @type actor :: term()
-
-  @callback authenticate(headers, opts :: keyword()) ::
-              {:ok, actor} | :anonymous | {:error, term()}
-
-  @doc """
-  Resolves the configured authenticator module, if any.
-
-  Precedence: explicit `:authenticator` option, then
-  `config :ash_grpc, :authenticator`. Returns `nil` when no authenticator
-  is configured (metadata-only mode).
-  """
-  @spec resolve(keyword()) :: module() | nil
-  def resolve(options) do
-    Keyword.get(options, :authenticator) || Application.get_env(:ash_grpc, :authenticator)
-  end
+  @type opts :: [actor: term(), tenant: term(), context: map()]
+  @type result ::
+          {:ok, opts()}
+          | {:error, :unauthenticated | :unavailable | {:unavailable, non_neg_integer()}}
 
   @doc """
-  Runs the resolved authenticator against `headers`.
+  Decides who is calling from the request headers.
 
-  Returns `{:ok, actor | nil}` on success (`nil` for anonymous or when no
-  authenticator is configured) or `{:error, grpc_error}` on failure.
+  Return `{:ok, opts}` with any of `:actor`, `:tenant` and `:context`, or
+  `{:error, :unauthenticated}`, `{:error, :unavailable}` or
+  `{:error, {:unavailable, retry_after_ms}}`.
   """
-  @spec authenticate(module() | nil, headers, keyword()) ::
-          {:ok, actor | nil} | {:error, map()}
-  def authenticate(nil, _headers, _options), do: {:ok, nil}
+  @callback authenticate(headers()) :: result()
 
-  def authenticate(module, headers, options) when is_atom(module) do
-    case module.authenticate(headers, options) do
-      {:ok, actor} -> {:ok, actor}
-      :anonymous -> {:ok, nil}
-      {:error, reason} -> {:error, unauthenticated(reason)}
+  @doc "What the authenticator answered for this call: `{:ok, opts}`, or `:error` before it ran."
+  @spec fetch_opts(%GRPC.Server.Stream{}) :: {:ok, opts()} | :error
+  def fetch_opts(%GRPC.Server.Stream{local: %{__MODULE__ => opts}}), do: {:ok, opts}
+  def fetch_opts(%GRPC.Server.Stream{}), do: :error
+
+  defmodule Interceptor do
+    @moduledoc false
+    @behaviour GRPC.Server.Interceptor
+
+    @impl true
+    def init(authenticator), do: authenticator
+
+    @impl true
+    def call(request, %{server: AshGrpc.Health.Server} = stream, next, _authenticator) do
+      next.(request, stream)
     end
-  end
 
-  defp unauthenticated(reason) when is_binary(reason) do
-    %{code: :unauthenticated, message: reason}
-  end
+    def call(request, stream, next, authenticator) do
+      opts = authenticate!(authenticator, stream)
+      local = Map.put(stream.local || %{}, AshGrpc.Authenticator, opts)
+      next.(request, %{stream | local: local})
+    end
 
-  defp unauthenticated(_reason) do
-    %{code: :unauthenticated, message: "authentication failed"}
+    defp authenticate!(authenticator, stream) do
+      case authenticator.authenticate(stream.http_request_headers) do
+        {:ok, opts} ->
+          opts
+
+        {:error, {:unavailable, retry_after_ms}}
+        when is_integer(retry_after_ms) and retry_after_ms >= 0 ->
+          GRPC.Server.set_headers(stream, %{
+            "grpc-retry-pushback-ms" => Integer.to_string(retry_after_ms)
+          })
+
+          raise AshGrpc.Errors.to_rpc_error(:unavailable)
+
+        {:error, reason} ->
+          raise AshGrpc.Errors.to_rpc_error(reason)
+      end
+    rescue
+      error in GRPC.RPCError -> reraise error, __STACKTRACE__
+      error -> raise AshGrpc.Errors.internal(error, __STACKTRACE__)
+    end
   end
 end

@@ -1,4 +1,1 @@
-{:ok, _} =
-  Supervisor.start_link([{Phoenix.PubSub, name: AshGrpc.TestPubSub}], strategy: :one_for_one)
-
-ExUnit.start()
+ExUnit.start(exclude: AshGrpc.TestSupport.Protoc.exclusions())
