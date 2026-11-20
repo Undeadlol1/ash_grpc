@@ -106,3 +106,11 @@ defmodule AshGrpc.TestSupport.NotesEndpoint do
     domains: [AshGrpc.TestSupport.Notes],
     authenticator: AshGrpc.TestSupport.Authenticator
 end
+
+defmodule AshGrpc.TestSupport.CappedNotesEndpoint do
+  @moduledoc false
+  use AshGrpc.Endpoint,
+    domains: [AshGrpc.TestSupport.Notes],
+    authenticator: AshGrpc.TestSupport.Authenticator,
+    max_subscriptions: 2
+end
