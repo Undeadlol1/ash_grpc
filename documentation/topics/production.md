@@ -80,6 +80,11 @@ default 60 second proxy timeouts cut it. Raise the read and send timeouts on
 both locations to the longest stream you accept (`1h` above), and have clients
 reconnect when a stream ends.
 
+Every open subscription re-reads its whole list on each write to its
+resource, so cap them with the endpoint's `max_subscriptions` option (default
+`1000` per node; one more is answered `RESOURCE_EXHAUSTED`). Set it to what
+your database can serve at your write rate.
+
 ## A CDN in front
 
 A CDN or an HTTP reverse proxy in front of nginx must pass gRPC through. On

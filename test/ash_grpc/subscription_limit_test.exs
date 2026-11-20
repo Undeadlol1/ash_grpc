@@ -9,13 +9,13 @@ defmodule AshGrpc.SubscriptionLimitTest do
   alias GRPC.RPCError
   alias GRPC.Status
 
-  defp watch(channel, author) do
+  defp watch(channel, author, timeout \\ 5_000) do
     test = self()
 
     spawn_link(fn ->
       case Stub.watch_notes(channel, %V1.WatchNotesRequest{},
              metadata: signed_in(author),
-             timeout: 5_000
+             timeout: timeout
            ) do
         {:ok, replies} -> Enum.each(replies, &send(test, {:reply, &1}))
         error -> send(test, {:reply, error})
@@ -50,19 +50,17 @@ defmodule AshGrpc.SubscriptionLimitTest do
   end
 
   test "a closed stream frees its place" do
-    full = start(CappedNotesEndpoint)
+    channel = start(CappedNotesEndpoint)
     author = "author#{System.unique_integer([:positive])}"
-    port = :ranch.get_port(inspect(CappedNotesEndpoint))
-    {:ok, leaving} = GRPC.Stub.connect("127.0.0.1:#{port}")
 
-    watch(leaving, author)
-    assert_receive {:reply, {:ok, %{synced: true}}}, 2_000
-    watch(full, author)
-    assert_receive {:reply, {:ok, %{synced: true}}}, 2_000
-    GRPC.Stub.disconnect(leaving)
-    wait_until_open(1)
+    for _stream <- 1..2, do: watch(channel, author, 1_000)
+    for _stream <- 1..2, do: assert_receive({:reply, {:ok, %{synced: true}}}, 2_000)
+    for _stream <- 1..2, do: assert_receive({:reply, {:error, %RPCError{}}}, 3_000)
+    wait_until_open(0)
 
-    watch(full, author)
-    assert_receive {:reply, {:ok, %{synced: true}}}, 2_000
+    for _stream <- 1..2 do
+      watch(channel, author)
+      assert_receive {:reply, {:ok, %{synced: true}}}, 2_000
+    end
   end
 end

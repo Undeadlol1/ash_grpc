@@ -133,6 +133,11 @@ gRPC-Web clients can stream too, so a browser can subscribe.
 
 ## Limits
 
+* An endpoint keeps at most `max_subscriptions` subscription streams open at
+  once on its node (default `1000`, set on `use AshGrpc.Endpoint`). The next
+  one is answered `RESOURCE_EXHAUSTED` and nothing is read for it. A stream
+  that ends, for any reason, frees its place. The count is per endpoint, not
+  per client: put a limit per client in your interceptors if you need one.
 * No backpressure and no coalescing. Every change causes one full read of the
   list (to find the record's position), not a read of one key, so a long list
   makes every change cost more. Every change causes one re-read, and a

@@ -123,6 +123,7 @@ defmodule AshGrpc.Handler do
       with {:ok, auth_opts} <- authenticated(stream),
            {opts, _deadline} = ash_opts(auth_opts, stream),
            {:ok, decoded} <- input(spec, request),
+           :ok <- within_subscription_limit(spec.endpoint),
            :ok <- AshGrpc.Notifier.subscribe(spec.resource),
            subscription = %{spec: spec, decoded: decoded, opts: opts, stream: stream},
            {:ok, records} <- read_all(subscription),
@@ -135,6 +136,16 @@ defmodule AshGrpc.Handler do
     then(with_result, fn {:error, error} -> AshGrpc.Errors.to_rpc_error(error) end)
   rescue
     error -> AshGrpc.Errors.internal(error, __STACKTRACE__)
+  end
+
+  defp within_subscription_limit(endpoint) do
+    group = {:subscriptions, endpoint}
+    :ok = :pg.join(AshGrpc.Notifier, group, self())
+    limit = endpoint.__ash_grpc__(:max_subscriptions)
+
+    if length(:pg.get_local_members(AshGrpc.Notifier, group)) > limit,
+      do: {:error, {:too_many_subscriptions, limit}},
+      else: :ok
   end
 
   defp watch(%{spec: %{resource: resource}} = subscription, sent) do
