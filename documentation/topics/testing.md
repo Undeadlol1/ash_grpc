@@ -68,19 +68,10 @@ Use a test authenticator that accepts a token you choose, or your real one
 with a test user. Sending different `metadata` is how you test policies:
 the same call as another actor or tenant.
 
-## Check the status and the field violations
+## Check errors
 
-```elixir
-assert {:error, %GRPC.RPCError{status: status, details: [detail]}} =
-         Stub.create_post(channel, %V1.CreatePostRequest{title: "ab"},
-           metadata: signed_in("alice")
-         )
-
-assert status == GRPC.Status.invalid_argument()
-
-assert %Google.Rpc.BadRequest{field_violations: [%{field: "title"}]} =
-         Google.Rpc.BadRequest.decode(detail.value)
-```
+A failed call returns `{:error, %GRPC.RPCError{}}`. How to read its status and
+field violations is in [Errors](errors.md#field-violations).
 
 An internal error logs its cause. Wrap the call in `ExUnit.CaptureLog.capture_log/1`
 to keep the test output clean, and to assert on the log:

@@ -76,7 +76,7 @@ protoc -I . \
   gadgets/v1.proto
 ```
 
-A browser cannot speak plain gRPC; see [Calling from a browser](browser-grpc-web.md)
+A browser cannot speak plain gRPC; see [Calling from a browser](endpoint-options.md#calling-from-a-browser-grpc-web)
 for the gRPC-Web side and the CORS option.
 
 ## Python

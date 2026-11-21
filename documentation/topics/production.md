@@ -1,7 +1,7 @@
 # Running in production
 
 The endpoint speaks plain HTTP/2 (h2c) unless you give it a certificate (see
-[TLS](tls.md)). Usually you run it behind a proxy that terminates TLS, on a
+[TLS](endpoint-options.md#tls)). Usually you run it behind a proxy that terminates TLS, on a
 port the proxy reaches and nothing else does.
 
     children = [{MyAppWeb.GrpcEndpoint, port: 50051}]
@@ -95,7 +95,7 @@ gRPC-Web, which is ordinary HTTP, keeps working.
 
 ## Health checks
 
-Turn the health service on (`health: true`, see [Health checks](health.md)) so
+Turn the health service on (`health: true`, see [Health checks](endpoint-options.md#health-checks)) so
 a probe can ask the listener itself. From a container with `curl` and HTTP/2:
 
     curl -fsS --http2-prior-knowledge -X POST \

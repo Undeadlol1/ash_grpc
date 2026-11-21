@@ -45,16 +45,9 @@ end
 ## Which process things run in
 
 Interceptors run in the process that handles the call. Without a client
-deadline every step runs in that process.
-
-The remaining time of the deadline is the Ash `timeout` of every step: the
-action, the record lookup of an update or destroy, and the calculation loads
-(a generic action also runs under it). Ash runs a step with a timeout in a task
-of its own when the data layer supports async work and the step is not already
-inside a transaction; otherwise it runs inline in the calling process. When the
-action runs in a transaction, the data layer transaction gets the timeout
-instead of a task. Process state set by an interceptor (the process dictionary,
-a collector) is therefore not visible to a step that runs in a task.
+deadline every step runs in that process. With one, a step may run in a task
+of its own, and process state set by an interceptor (the process dictionary, a
+collector) is not visible to it; see [Deadlines](actions.md#deadlines).
 
 Do not rely on interceptor process state inside an action; use
 `put_response_meta/2` with a function, which always runs in the interceptor's
