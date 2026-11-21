@@ -72,7 +72,7 @@ response meta below.
 
 ## Response meta
 
-`response_meta: true` gives every response message a field
+`response_meta: true` gives every response message of a unary call a field
 `optional string meta = 2;`: a JSON document as text. It is a string rather
 than `google.protobuf.Struct`, which turns every number into a double.
 

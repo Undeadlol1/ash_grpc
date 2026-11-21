@@ -1,7 +1,8 @@
 # Running in production
 
-The endpoint speaks plain HTTP/2 (h2c) and has no TLS options. Run it behind a
-proxy that terminates TLS, on a port the proxy reaches and nothing else does.
+The endpoint speaks plain HTTP/2 (h2c) unless you give it a certificate (see
+[TLS](tls.md)). Usually you run it behind a proxy that terminates TLS, on a
+port the proxy reaches and nothing else does.
 
     children = [{MyAppWeb.GrpcEndpoint, port: 50051}]
 
