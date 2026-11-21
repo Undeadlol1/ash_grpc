@@ -57,6 +57,19 @@ defmodule AshGrpc.AggregateFieldsTest do
       Map.new(tallies, &{&1.name, &1})
     end
 
+    test "a ci_string and an array of them are answered as their strings", %{
+      channel: channel,
+      metadata: metadata
+    } do
+      Ash.Seed.seed!(AshGrpc.TestSupport.Entry, %{code: "Hello", codes: ["A", "b"]})
+
+      assert {:ok, %{result: entries}} =
+               Stub.list_entries(channel, %V1.ListEntriesRequest{}, metadata: metadata)
+
+      entry = Enum.find(entries, &(&1.code == "Hello"))
+      assert {entry.code, entry.codes} == {"Hello", ["A", "b"]}
+    end
+
     test "count, sum, exists and list are loaded with the read", %{
       channel: channel,
       metadata: metadata
