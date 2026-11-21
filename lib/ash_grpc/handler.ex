@@ -404,8 +404,14 @@ defmodule AshGrpc.Handler do
       [strategy: [:atomic, :atomic_batches, :stream]] ++ opts ++ @bulk_options ++ deadline(stream)
 
     case spec.action_type do
-      :update -> query |> Ash.bulk_update(spec.action, input, options) |> bulk_records([])
-      :destroy -> query |> Ash.bulk_destroy(spec.action, input, options) |> bulk_records([])
+      :update ->
+        query |> Ash.bulk_update(spec.action, input, options) |> bulk_records([])
+
+      :destroy ->
+        # The atomic strategies can only load after the destroy, which loses aggregates.
+        loaded = if spec.loads == [], do: [], else: [strategy: [:stream], load: spec.loads]
+
+        query |> Ash.bulk_destroy(spec.action, input, loaded ++ options) |> bulk_records([])
     end
   end
 
