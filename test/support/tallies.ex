@@ -7,7 +7,7 @@ defmodule AshGrpc.TestSupport.Entry do
 
   grpc do
     proto_message "Entry"
-    fields id: 1, amount: 2, label: 3
+    fields id: 1, amount: 2, label: 3, code: 4, codes: 5
   end
 
   actions do
@@ -23,6 +23,8 @@ defmodule AshGrpc.TestSupport.Entry do
     uuid_primary_key :id, public?: true
     attribute :amount, :integer, public?: true
     attribute :label, :string, public?: true
+    attribute :code, :ci_string, public?: true
+    attribute :codes, {:array, :ci_string}, public?: true
   end
 
   relationships do
@@ -138,6 +140,8 @@ defmodule AshGrpc.TestSupport.Tallies do
         sort: false,
         filter: false,
         page: false
+
+      rpc Entry, :list_entries, :read, sort: false, filter: false, page: false
 
       rpc Entry, :create_entry, :create,
         sort: false,

@@ -79,6 +79,12 @@ defmodule AshGrpc.DerivedInputsTest do
     assert request(domain, "MakeDocRequest").fields == [title: 1, body: 2, tag: 3]
   end
 
+  test "GIVEN a create that accepts a private attribute WHEN built THEN the request leaves it out" do
+    domain = create_domain([:title, :secret])
+
+    assert request(domain, "MakeDocRequest").fields == [title: 1]
+  end
+
   test "GIVEN an update rpc without args WHEN built THEN the primary key comes first, then accepted attributes, then arguments" do
     domain =
       domain(

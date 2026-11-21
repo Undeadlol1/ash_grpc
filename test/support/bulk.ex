@@ -75,7 +75,7 @@ defmodule AshGrpc.TestSupport.Seat do
 
   grpc do
     proto_message "Seat"
-    fields row: 1, number: 2, holder: 3
+    fields row: 1, number: 2, holder: 3, tag: 4
   end
 
   actions do
@@ -90,6 +90,10 @@ defmodule AshGrpc.TestSupport.Seat do
     attribute :row, :string, primary_key?: true, allow_nil?: false, public?: true
     attribute :number, :integer, primary_key?: true, allow_nil?: false, public?: true
     attribute :holder, :string, public?: true
+  end
+
+  calculations do
+    calculate :tag, :string, expr(row <> "-" <> type(number, :string)), public?: true
   end
 end
 

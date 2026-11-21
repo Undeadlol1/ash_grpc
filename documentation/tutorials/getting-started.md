@@ -24,41 +24,6 @@ end
 If your resources use policies, Ash needs a SAT solver such as
 `:picosat_elixir` in your own dependencies.
 
-## The shortest path
-
-A resource with only the extension, a domain with two rpcs, an authenticator
-and an endpoint (steps 3 and 4), and `config :ash_grpc, proto_output:` (step 5)
-are all it takes. The rest of this guide shows what each step does.
-
-```elixir
-defmodule MyApp.Blog.Post do
-  use Ash.Resource, domain: MyApp.Blog, extensions: [AshGrpc.Resource]
-end
-
-defmodule MyApp.Blog do
-  use Ash.Domain, extensions: [AshGrpc.Domain]
-
-  grpc do
-    package "blog.v1"
-
-    service "Posts" do
-      resource MyApp.Blog.Post do
-        rpc :list_posts, :read
-        rpc :create_post
-      end
-    end
-  end
-end
-```
-
-The `resource` block holds the calls of one resource. The action defaults to the call's name; write it only when they differ. Here `:create_post` is
-the name of the call and also of the action, so `rpc :create_post`
-is enough. For one call, `rpc MyApp.Blog.Post, :create_post` on one line does the same.
-
-`proto_output` is needed because field numbers are automatic: they are kept
-in the generated `.proto`, which has to be committed and present at compile
-time.
-
 ## 1. Choose the wire fields of a resource
 
 Add `AshGrpc.Resource`. Every public attribute, calculation, aggregate and

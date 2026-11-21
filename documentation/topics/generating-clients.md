@@ -76,7 +76,7 @@ protoc -I . \
   gadgets/v1.proto
 ```
 
-A browser cannot speak plain gRPC; see [Calling from a browser](browser-grpc-web.md)
+A browser cannot speak plain gRPC; see [Calling from a browser](endpoint-options.md#calling-from-a-browser-grpc-web)
 for the gRPC-Web side and the CORS option.
 
 ## Python
@@ -132,16 +132,9 @@ Keyset paging: send the previous `last_keyset` as `after`. See
 ### Subscriptions
 
 A subscription is a server-streaming rpc. Every message has `result`,
-`removed` and `synced`:
-
-1. One message per current record, with `synced = false`.
-2. One message with `synced = true` and no `result`: the snapshot is complete,
-   even if it was empty.
-3. Then one message per change. `removed = true` means the record left your
-   view; `result` then holds only its primary key.
-
-Keep the records in a map by primary key, show the list when `synced` arrives,
-and apply each later message to the map. See [Subscriptions](subscriptions.md).
+`removed`, `synced` and `position`. The client collects the records until
+`synced` arrives, then applies each change by `position`; a map by primary key
+is not enough. How, in [Subscriptions](subscriptions.md).
 
 ### Errors and deadlines
 

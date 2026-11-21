@@ -311,6 +311,14 @@ defmodule AshGrpc.BulkTest do
       assert titles(ctx.owner) == ["memo"]
     end
 
+    test "answers each destroyed record with its calculations", ctx do
+      Ash.Seed.seed!(Seat, %{row: "Y", number: 1})
+      request = %Bulk.DeleteSeatsRequest{ids: [%Bulk.DeleteSeatsKey{row: "Y", number: 1}]}
+
+      assert {:ok, %{result: [%{tag: "Y-1"}]}} =
+               Stub.delete_seats(ctx.channel, request, metadata: signed_in(ctx.owner))
+    end
+
     test "a composite primary key destroys by key message", ctx do
       Ash.Seed.seed!(Seat, %{row: "Z", number: 1})
       Ash.Seed.seed!(Seat, %{row: "Z", number: 2})

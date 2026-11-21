@@ -64,9 +64,8 @@ The `error` is a `google.rpc.Status` with the same code, message and details a
 unary call would raise (see [Errors](errors.md)), so a field violation still
 names the field.
 
-Generated protos import `google/rpc/status.proto`. A client build gets that
-file from [googleapis](https://github.com/googleapis/googleapis) (see
-[Generating clients](generating-clients.md)).
+Generated protos import `google/rpc/status.proto`; see
+[Generating clients](generating-clients.md).
 
 ## Limits
 

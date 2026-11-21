@@ -502,6 +502,7 @@ defmodule AshGrpc.Types do
   def encode(:struct, value) when is_map(value),
     do: value |> Jason.encode!() |> Jason.decode!() |> to_struct()
 
+  def encode(:string, %Ash.CiString{} = value), do: to_string(value)
   def encode(:atom, value) when is_atom(value), do: Atom.to_string(value)
   def encode(:double, value) when is_integer(value), do: value * 1.0
   def encode(_kind, value), do: value

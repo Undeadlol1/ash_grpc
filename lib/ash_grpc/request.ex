@@ -136,7 +136,10 @@ defmodule AshGrpc.Request do
     names =
       Enum.uniq(
         if(action.type in [:update, :destroy], do: primary_key, else: []) ++
-          if(action.type in [:create, :update, :destroy], do: action.accept || [], else: []) ++
+          if(action.type in [:create, :update, :destroy],
+            do: Enum.filter(action.accept || [], &Info.attribute(resource, &1).public?),
+            else: []
+          ) ++
           for(argument <- action.arguments, argument.public?, do: argument.name)
       )
 

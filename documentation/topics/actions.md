@@ -39,7 +39,7 @@ Leave `args` out and the request holds what the action takes, in this order:
 
 - for an update or destroy, the primary key;
 - for a create, update or destroy, the attributes the action accepts
-  (`accept`), in that order;
+  (`accept`), in that order, leaving out private ones;
 - the action's public arguments, in declaration order.
 
 A read gets only its public arguments (no primary key; a lookup by key is
@@ -137,7 +137,7 @@ filter, policies and tenant. No record is `NOT_FOUND`, an omitted key is
 rpc MyApp.Blog.Post, :create_post, :create
 ```
 
-The request holds the arguments and accepted attributes you list.
+The request is the one described in [The request](#the-request).
 
 ### Update
 
@@ -266,9 +266,9 @@ then takes `repeated google.protobuf.Struct comments`.
 ## Upserts and bulk calls
 
 An upsert is an Ash feature of the create action (`upsert? true`, with
-`upsert_identity`), so it works through the rpc of that action. There are no
-bulk rpcs: call the action once per record, or write a generic action that
-takes an array argument and give it an rpc.
+`upsert_identity`), so it works through the rpc of that action. Bulk rpcs
+exist: `bulk?: true` on a create, update or destroy rpc changes many records in
+one all-or-nothing call; see [Bulk calls](bulk-calls.md).
 
 ## Deadlines
 

@@ -36,23 +36,23 @@ defmodule AshGrpc.Endpoint do
       the origin, lets browsers call the endpoint over gRPC-Web. CORS headers
       are set before authentication, a preflight is answered without the
       authenticator, interceptors or any action. The default is off. See
-      [Calling from a browser](browser-grpc-web.md).
+      [Calling from a browser](endpoint-options.md#calling-from-a-browser-grpc-web).
     * `:reflection` - `true` serves gRPC server reflection (v1 and v1alpha) for
       the endpoint's services, so `grpcurl` and Postman work without a `.proto`
       file. Needs `{:grpc_reflection, "~> 0.5"}` in your deps. Reflection calls
       are authenticated like every other call. The default is off. See
-      [Server reflection](reflection.md).
+      [Server reflection](endpoint-options.md#server-reflection).
     * `:health` - `true` serves the standard `grpc.health.v1.Health` service.
       `Check` answers `SERVING` for an empty name and for every service the
       endpoint serves, `NOT_FOUND` for any other name; `Watch` sends the
       current status and stays open. Health calls need no credentials. The
-      default is off. See [Health checks](health.md).
+      default is off. See [Health checks](endpoint-options.md#health-checks).
     * `:compressors` - `GRPC.Compressor` modules the generated servers accept
       and answer with, for example `[GRPC.Compressor.Gzip]`. A client that
       sends `grpc-encoding: gzip` is understood and answered with gzip. The
       default is `[]`: no compression, and a call that asks for one is
       refused. The health service does not take part. See
-      [Compression](compression.md).
+      [Compression](endpoint-options.md#compression).
     * `:max_subscriptions` - how many subscription streams this endpoint keeps
       open at once, on this node. One more is answered `RESOURCE_EXHAUSTED`.
       Each open subscription re-reads its list on every write to its resource,
