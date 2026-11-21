@@ -39,7 +39,7 @@ Leave `args` out and the request holds what the action takes, in this order:
 
 - for an update or destroy, the primary key;
 - for a create, update or destroy, the attributes the action accepts
-  (`accept`), in that order;
+  (`accept`), in that order, leaving out private ones;
 - the action's public arguments, in declaration order.
 
 A read gets only its public arguments (no primary key; a lookup by key is
